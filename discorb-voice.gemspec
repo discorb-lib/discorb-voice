@@ -32,7 +32,7 @@ Gem::Specification.new do |spec|
   # spec.add_dependency "example-gem", "~> 1.0"
   spec.add_dependency "discorb", ">= 0.5.2"
   spec.add_dependency "async-io"
-  spec.add_dependency "ffi", ">= 1.9.24"
+  spec.add_dependency "ffi", ">= 1.15.3"
   spec.add_dependency "opus-ruby"
 
   # For more information and examples about making a new gem, checkout our

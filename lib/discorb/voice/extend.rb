@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "./lib/client"
+
 module Discorb::Voice
   module ClientVoicePrepend
     def initialize(...)
@@ -11,7 +13,7 @@ module Discorb::Voice
 
   module ClientVoiceInclude
     def event_voice_server_update(data)
-      client = Discorb::Voice::Client.new(self, data)
+      client = Discorb::Voice::VoiceClient.new(self, data)
       @voice_clients[data[:guild_id]] = client
       @voice_conditions[data[:guild_id]].signal client
     end

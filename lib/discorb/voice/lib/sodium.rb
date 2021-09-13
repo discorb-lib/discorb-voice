@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
+require "ffi"
+
 module Discorb::Voice
   # @!visibility private
   module Sodium
     extend FFI::Library
 
-    ffi_lib(["sodium", "libsodium.so.18", "libsodium.so.23"])
+    ffi_lib(["sodium", "libsodium", "libsodium.so.18", "libsodium.so.23"])
 
     # Encryption & decryption
     attach_function(:crypto_secretbox_xsalsa20poly1305, %i[pointer pointer ulong_long pointer pointer], :int)
