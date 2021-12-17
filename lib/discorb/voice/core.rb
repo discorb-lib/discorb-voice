@@ -29,7 +29,7 @@ module Discorb
         @endpoint = data[:endpoint]
         @connect_condition = Async::Condition.new
         Async do
-          start_receive
+          start_receive false
         end
       end
 
@@ -47,53 +47,104 @@ module Discorb
         })
       end
 
-      def send_audio(data)
-        Async do
+      def play(data)
+        task = Async do
           speaking
           stream = OggStream.new(data.io)
+          loops = 0
+          start_time = Time.now.to_f
+          delay = OPUS_FRAME_LENGTH / 1000.0
 
-          stream.pages.each_with_index do |packet, i|
+          stream.packets.each_with_index do |packet, i|
             @timestamp += (OPUS_SAMPLE_RATE / 1000.0 * OPUS_FRAME_LENGTH).to_i
             @sequence += 1
             # puts packet.data[...10].unpack1("H*")
-            header = create_header
-            @voice_connection.send(
-              header + encrypt_audio(
-                packet.data,
-                header
-              ),
-              0
-              # @sockaddr
-            )
+            # puts packet[-10..]&.unpack1("H*")
+            send_audio(packet)
             # puts "Sent packet #{i}"
-
-            sleep(OPUS_FRAME_LENGTH / 1000.0)
+            loops += 1
+            next_time = start_time + (delay * loops)
+            sleep(next_time - Time.now.to_f) if next_time > Time.now.to_f
             # @voice_connection.flush
           end
+
+          stop_speaking
         end
+        @playing_task = task
+      end
+
+      def stop
+        playing_task.stop
+        send_audio(OPUS_SILENCE)
+        stop_speaking
+      end
+
+      def disconnect
+        @connection.close
+        cleanup
       end
 
       private
 
-      def start_receive
+      OPUS_SILENCE = [0xF8, 0xFF, 0xFE].pack("C*")
+
+      def cleanup
+        @heartbeat_task&.stop
+
+        @voice_connection&.close
+      end
+
+      def send_audio(data)
+        header = create_header
+        @voice_connection.send(
+          header + encrypt_audio(
+            data,
+            header
+          ),
+          0
+          # @sockaddr
+        )
+      rescue IOError
+        sleep 5
+      end
+
+      def start_receive(resume)
         Async do
           endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
+          @client.log.info("Connecting to #{endpoint}")
           Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection) do |conn|
             @connection = conn
-            send_connection_message(
-              0,
-              {
-                server_id: @guild_id,
-                user_id: @client.user.id,
-                session_id: @client.session_id,
-                token: @token,
-              }
-            )
+            if resume
+              send_connection_message(
+                7,
+                {
+                  server_id: @guild_id,
+                  session_id: @client.session_id,
+                  token: @token,
+                }
+              )
+            else
+              send_connection_message(
+                0,
+                {
+                  server_id: @guild_id,
+                  user_id: @client.user.id,
+                  session_id: @client.session_id,
+                  token: @token,
+                }
+              )
+            end
             while (raw_message = @connection.read)
               message = JSON.parse(raw_message, symbolize_names: true)
               handle_voice_connection(message)
             end
-          rescue EOFError
+          rescue Protocol::WebSocket::ClosedError => e
+            case e.code
+            when 4014
+              cleanup
+            when 4015, 1001, 4009
+              start_receive true
+            end
           end
         end
       end

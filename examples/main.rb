@@ -1,12 +1,33 @@
 require "discorb"
 require "discorb/voice"
+require "open3"
 
 client = Discorb::Client.new
 
-client.once :ready do
+client.once :standby do
   puts "Logged in as #{client.user}"
-  vc = client.connect_to(client.channels["867704702577278996"])
-  binding.irb
 end
 
-client.run("ODA0ODE4NjcwOTc0NDAyNTkx.YBR3yw.V2iJi7ul1OfNTBminlCG3V8nvUc")
+client.slash "connect", "connect to a voice channel" do |interaction|
+  channel = interaction.target.voice_state.channel
+  interaction.post "Connecting to #{channel.name}"
+  channel.connect.wait
+  interaction.post "Connected to #{channel.name}"
+end
+
+client.slash "play", "Plays YouTube audio", {
+  "url" => {
+    type: :string,
+    description: "The URL of the YouTube video to play",
+    required: true,
+  },
+} do |interaction, url|
+  interaction.post "Querying #{url}..."
+  stdout, _status = Open3.capture2("youtube-dl", "-j", url)
+  data = JSON.parse(stdout, symbolize_names: true)
+  url = data[:formats][0][:url]
+  interaction.guild.voice_client.play(Discorb::Voice::FFmpegAudio.new(url))
+  interaction.post "Playing `#{data[:title]}`"
+end
+
+client.run(ENV["DISCORD_BOT_TOKEN"])

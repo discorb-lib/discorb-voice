@@ -4,27 +4,42 @@ module Discorb::Voice
       @io = io
     end
 
-    def pages
+    def packets
+      Enumerator.new do |enum|
+        part = +""
+        raw_packets.each do |packet|
+          part << packet.data
+          unless packet.partial
+            enum << part
+            part = +""
+          end
+        end
+      end
+    end
+
+    def raw_packets
       Enumerator.new do |enum|
         loop do
+          if @io.read(4) != "OggS"
+            break
+          end
           pg = Page.new(@io)
           pg.packets.each do |packet|
             enum << packet
           end
           # enum << pg.packets.next
           # p pg.header_type
-          break if pg.header_type == 4
         end
       end
     end
 
     class Page
-      Packet = Struct.new(:data, :partial)
+      Packet = Struct.new(:data, :partial, :page)
       attr_reader :version, :header_type, :granule_position, :bitstream_serial_number, :page_sequence_number, :crc_checksum, :page_segments, :body
 
       def initialize(io)
         @version, @header_type, @granule_position, @bitstream_serial_number, @page_sequence_number, @crc_checksum, @page_segments =
-          io.read(27).unpack("@4CCQ<L<L<L<C")
+          io.read(23).unpack("CCQ<L<L<L<C")
         @segtable = io.read(@page_segments)
         len = @segtable.unpack("C*").sum
         @body = io.read(len)
@@ -42,13 +57,13 @@ module Discorb::Voice
             else
               length += seg
               partial = false
-              enum << Packet.new(@body[offset, length], partial)
+              enum << Packet.new(@body[offset, length], partial, self)
               offset += length
               length = 0
             end
           end
 
-          enum << Packet.new(@body[offset, length], partial) if partial
+          enum << Packet.new(@body[offset, length], partial, self) if partial
         end
       end
     end

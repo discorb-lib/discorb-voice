@@ -40,3 +40,9 @@ class Discorb::Client
   include Discorb::Voice::ClientVoiceInclude
   prepend Discorb::Voice::ClientVoicePrepend
 end
+
+class Discorb::Guild
+  def voice_client
+    @client.voice_clients[@id.to_s]
+  end
+end
