@@ -1,29 +1,106 @@
 require "open3"
+require "tmpdir"
 
 module Discorb::Voice
+  #
+  # The source of audio data.
+  # @abstract
+  #
+  class Source
+    #
+    # The audio ogg stream. This MUST be implemented by subclasses.
+    #
+    # @return [#read] The audio ogg stream.
+    #
+    def io
+      raise NotImplementedError
+    end
+
+    #
+    # Clean up the source.
+    # This does nothing by default.
+    #
+    def cleanup
+      # noop
+    end
+  end
+
+  #
+  # Plays audio from a source, using FFmpeg.
+  # @note You must install FFmpeg and should be on the PATH.
+  #
   class FFmpegAudio
     attr_reader :stdin, :stdout, :stderr, :process
 
-    def initialize(source, bitrate: 128)
-      @stdin, @stdout, @stderr, @process = Open3.popen3(
-        *(%W[ffmpeg -i #{source} -map_metadata -1 -f opus -c:a libopus -ar 48000 -ac 2 -b:a #{bitrate}k -loglevel warning pipe:1"])
-      )
+    #
+    # Creates a new FFmpegAudio.
+    #
+    # @param [String, IO] source The source of audio data.
+    # @param [Integer] bitrate The bitrate of the audio.
+    # @param [{String => String}] extra_options Extra options for FFmpeg.
+    #
+    def initialize(source, bitrate: 128, extra_options: {})
+      if source.is_a?(String)
+        source_path = source
+        @tmp_path = nil
+      else
+        source_path = "#{Dir.tmpdir}/#{Process.pid}.#{source.object_id}"
+        @tmp_path = source_path
+        File.open(source_path, "wb") do |f|
+          while chunk = source.read(4096)
+            f.write(chunk)
+          end
+        end
+      end
+      args = %W[
+        ffmpeg
+        -i #{source_path}
+        -map_metadata -1
+        -f opus
+        -c:a libopus
+        -ar 48000
+        -ac 2
+        -b:a #{bitrate}k
+        -loglevel warning
+        pipe:1"]
+      extra_options.each do |key, value|
+        args += ["-#{key}", "#{value}"]
+      end
+      @stdin, @stdout, @stderr, @process = Open3.popen3(*args)
     end
 
     def io
       @stdout
     end
 
-    def kill
+    #
+    # Kills the FFmpeg process.
+    #
+    def cleanup
       @process.kill
+      if @tmp_path
+        File.delete(@tmp_path)
+      end
     end
   end
 
+  #
+  # Plays audio from a ogg file.
+  #
   class OggAudio
     attr_reader :io
 
+    #
+    # Opens an ogg file.
+    #
+    # @param [String, IO] src The ogg file to open, or an IO object.
+    #
     def initialize(src)
-      @io = File.open(src, "rb")
+      if src.is_a?(String)
+        @io = File.open(src, "rb")
+      else
+        @io = src
+      end
     end
   end
 end

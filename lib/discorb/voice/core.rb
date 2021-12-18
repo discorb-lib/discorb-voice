@@ -15,28 +15,47 @@ module Discorb
   end
 
   module Voice
-    DATA_LENGTH = 1920 * 2
     OPUS_SAMPLE_RATE = 48000
     OPUS_FRAME_LENGTH = 20
 
     class Client
+      # @private
       attr_reader :connect_condition
+      # @return [:connecting, :connected, :closed, :ready, :reconnecting] The current status of the voice connection
+      attr_reader :status
+      # @return [:stopped, :playing] The current status of playing audio
+      attr_reader :playing_status
+      # @return [Async::Condition] The condition of playing audio
+      attr_reader :playing_condition
 
+      # @private
       def initialize(client, data)
         @client = client
         @token = data[:token]
         @guild_id = data[:guild_id]
         @endpoint = data[:endpoint]
+        @status = :connecting
+        @playing_status = :stopped
         @connect_condition = Async::Condition.new
+        @paused_condition = Async::Condition.new
+        @play_condition = Async::Condition.new
         Async do
           start_receive false
         end
       end
 
+      #
+      # Sends a speaking indicator to the server.
+      #
+      # @param [Boolean] high_priority Whether to send audio in high priority.
+      #
       def speaking(high_priority: false)
+        flag = 1
+        flag |= 1 << 2 if high_priority
         send_connection_message(5, {
-          speaking: 1 + (high_priority ? 1 << 2 : 0),
+          speaking: flag,
           delay: 0,
+          ssrc: @ssrc,
         })
       end
 
@@ -44,18 +63,35 @@ module Discorb
         send_connection_message(5, {
           speaking: false,
           delay: 0,
+          ssrc: @ssrc,
         })
       end
 
-      def play(data)
-        task = Async do
-          speaking
-          stream = OggStream.new(data.io)
+      #
+      # Plays audio from a source.
+      #
+      # @param [Discorb::Voice::Source] source data The audio source
+      # @param [Boolean] high_priority Whether to play audio in high priority
+      #
+      def play(source, high_priority: false)
+        @playing_task = Async do
+          speaking(high_priority: high_priority)
+          @playing_status = :playing
+          @playing_condition = Async::Condition.new
+          stream = OggStream.new(source.io)
           loops = 0
-          start_time = Time.now.to_f
+          @start_time = Time.now.to_f
           delay = OPUS_FRAME_LENGTH / 1000.0
 
           stream.packets.each_with_index do |packet, i|
+            @connect_condition.wait if @status == :connecting
+            if @playing_status == :stopped
+              source.cleanup
+              break
+            elsif @playing_status == :paused
+              @paused_condition.wait
+            end
+            # p i
             @timestamp += (OPUS_SAMPLE_RATE / 1000.0 * OPUS_FRAME_LENGTH).to_i
             @sequence += 1
             # puts packet.data[...10].unpack1("H*")
@@ -63,24 +99,55 @@ module Discorb
             send_audio(packet)
             # puts "Sent packet #{i}"
             loops += 1
-            next_time = start_time + (delay * loops)
+            next_time = @start_time + (delay * (loops + 1))
+            # p [next_time, Time.now.to_f, delay]
             sleep(next_time - Time.now.to_f) if next_time > Time.now.to_f
             # @voice_connection.flush
           end
-
-          stop_speaking
+          # p :e
+          # @playing_status = :stopped
+          # @playing_condition.signal
+          # source.cleanup
+          # stop_speaking
         end
-        @playing_task = task
       end
 
+      # Note: This is commented out because it raises an error.
+      #    It's not clear why this is happening.
+      # #
+      # # Pause playing audio.
+      # #
+      # def pause
+      #   raise VoiceError, "Not playing" unless @playing_status == :playing
+      #   send_audio(OPUS_SILENCE)
+      #   @paused_condition = Async::Condition.new
+      #   @paused_offset = Time.now.to_f - @start_time
+      #   @playing_status = :paused
+      # end
+
+      # #
+      # # Resumes playing audio.
+      # #
+      # def resume
+      #   raise VoiceError, "Not paused" unless @playing_status == :paused
+      #   @paused_condition.signal
+      #   @start_time = Time.now.to_f - @paused_offset
+      # end
+
+      #
+      # Stop playing audio.
+      #
       def stop
-        playing_task.stop
+        @playing_status = :stopped
         send_audio(OPUS_SILENCE)
-        stop_speaking
       end
 
+      #
+      # Disconnects from the voice server.
+      #
       def disconnect
         @connection.close
+        @client.disconnect_voice(@guild_id)
         cleanup
       end
 
@@ -105,7 +172,8 @@ module Discorb
           # @sockaddr
         )
       rescue IOError
-        sleep 5
+        @client.log.warn("Voice connection closed")
+        @playing_task.stop if @status != :closed
       end
 
       def start_receive(resume)
@@ -114,6 +182,7 @@ module Discorb
           @client.log.info("Connecting to #{endpoint}")
           Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection) do |conn|
             @connection = conn
+            @status = :connected
             if resume
               send_connection_message(
                 7,
@@ -138,11 +207,21 @@ module Discorb
               message = JSON.parse(raw_message, symbolize_names: true)
               handle_voice_connection(message)
             end
+          rescue Async::Wrapper::Cancelled
+            @status = :closed
+            cleanup
           rescue Protocol::WebSocket::ClosedError => e
             case e.code
             when 4014
+              @status = :closed
               cleanup
+            when 4006
+              @status = :reconnecting
+              @connect_condition = Async::Condition.new
+              start_receive false
             when 4015, 1001, 4009
+              @status = :reconnecting
+              @connect_condition = Async::Condition.new
               start_receive true
             end
           end
@@ -150,6 +229,7 @@ module Discorb
       end
 
       def handle_voice_connection(message)
+        @client.log.debug("Voice connection message: #{message}")
         data = message[:d]
         # pp data
         case message[:op]
@@ -157,6 +237,7 @@ module Discorb
           @heartbeat_task = handle_heartbeat(data[:heartbeat_interval])
         when 2
           @port, @ip = data[:port], data[:ip]
+          @client.log.debug("Connected to voice UDP, #{@ip}:#{@port}")
           @sockaddr = Socket.pack_sockaddr_in(@port, @ip)
           @voice_connection = UDPSocket.new
           @voice_connection.connect(@ip, @port)
@@ -178,6 +259,10 @@ module Discorb
           @secret_key = data[:secret_key].pack("C*")
           @box = RbNaCl::SecretBox.new(@secret_key)
           @connect_condition.signal
+          @status = :ready
+        when 9
+          @connect_condition.signal
+          @status = :ready
         end
       end
 
