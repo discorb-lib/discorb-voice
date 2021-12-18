@@ -30,4 +30,9 @@ client.slash "play", "Plays YouTube audio", {
   interaction.post "Playing `#{data[:title]}`"
 end
 
+client.slash "stop", "Stops the current audio" do |interaction|
+  interaction.guild.voice_client.stop
+  interaction.post "Stopped"
+end
+
 client.run(ENV["DISCORD_BOT_TOKEN"])
