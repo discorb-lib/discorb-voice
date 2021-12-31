@@ -210,6 +210,10 @@ module Discorb
           rescue Async::Wrapper::Cancelled
             @status = :closed
             cleanup
+          rescue Errno::EPIPE
+            @status = :reconnecting
+            @connect_condition = Async::Condition.new
+            start_receive false
           rescue Protocol::WebSocket::ClosedError => e
             case e.code
             when 4014
