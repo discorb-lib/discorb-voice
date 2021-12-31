@@ -25,8 +25,13 @@ Or install it yourself as:
 Get libsodium from [here](https://download.libsodium.org/libsodium/releases/).
 I've checked `libsodium-1.0.17-stable-mingw.tar.gz` works.
 
-Then, if you are using x64 ruby (Check with `ruby -e 'puts RUBY_PLATFORM'`), extract `libsodium-win64`, then copy the `libsodium-23.dll` in `bin` to `C:/Windows/System32/sodium.dll`.
-If you are using x86 ruby, extract `libsodium-win32`, then copy the `libsodium-23.dll` in `bin` to `C:/Windows/SysWOW64/sodium.dll`.
+Then, if you are using x64 ruby (Check with `ruby -e 'puts RUBY_PLATFORM'`)...
+1. extract `libsodium-win64`
+2. copy `libsodium-23.dll` in `bin` to `C:/Windows/System32/sodium.dll`
+
+If you are using x86 ruby...
+1. extract `libsodium-win32`
+2. copy `libsodium-23.dll` in `bin` to `C:/Windows/SysWOW64/sodium.dll`.
 
 #### Linux
 
@@ -107,3 +112,9 @@ The gem is available as open source under the terms of the [MIT License](https:/
 ## Acknowledgments
 
 The implementation of the voice client is based on [discord.py](https://github.com/Rapptz/discord.py) library.
+
+```
+Copyright (c) 2015-present Rapptz
+Released under the MIT license
+https://github.com/Rapptz/discord.py/blob/master/LICENSE
+```
