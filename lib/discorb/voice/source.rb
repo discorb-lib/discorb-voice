@@ -37,7 +37,8 @@ module Discorb::Voice
     #
     # @param [String, IO] source The source of audio data.
     # @param [Integer] bitrate The bitrate of the audio.
-    # @param [{String => String}] extra_options Extra options for FFmpeg.
+    # @param [{String => String}] extra_options Extra options for FFmpeg. This will be passed before `-i`.
+    # @param [{String => String}] extra_options2 Extra options for FFmpeg. This will be passed after `-i`.
     #
     def initialize(source, bitrate: 128, extra_options: {})
       if source.is_a?(String)
@@ -54,17 +55,19 @@ module Discorb::Voice
       end
       args = %W[
         ffmpeg
-        -i #{source_path}
         -map_metadata -1
         -f opus
         -c:a libopus
         -ar 48000
         -ac 2
         -b:a #{bitrate}k
-        -loglevel warning
-        pipe:1"]
+        -loglevel warning]
       extra_options.each do |key, value|
-        args += ["-#{key}", "#{value}"]
+        args << ["-#{key}", "#{value}"]
+      end
+      args << ["-i", source_path]
+      extra_options2.each do |key, value|
+        args << ["-#{key}", "#{value}"]
       end
       @stdin, @stdout, @stderr, @process = Open3.popen3(*args)
     end
