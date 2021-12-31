@@ -40,7 +40,7 @@ module Discorb::Voice
     # @param [{String => String}] extra_options Extra options for FFmpeg. This will be passed before `-i`.
     # @param [{String => String}] extra_options2 Extra options for FFmpeg. This will be passed after `-i`.
     #
-    def initialize(source, bitrate: 128, extra_options: {})
+    def initialize(source, bitrate: 128, extra_options: {}, extra_options2: {})
       if source.is_a?(String)
         source_path = source
         @tmp_path = nil
