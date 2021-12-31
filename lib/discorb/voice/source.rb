@@ -69,7 +69,7 @@ module Discorb::Voice
         args += ["-#{key}", "#{value}"]
       end
       args += %w[pipe:1]
-      @stdin, @stdout, @stderr, @process = Open3.popen3(*args)
+      @stdin, @stdout, @process = Open3.popen2(*args)
     end
 
     def io
