@@ -63,13 +63,13 @@ module Discorb::Voice
         -b:a #{bitrate}k
         -loglevel warning]
       extra_options.each do |key, value|
-        args << ["-#{key}", "#{value}"]
+        args += ["-#{key}", "#{value}"]
       end
-      args << ["-i", source_path]
+      args += ["-i", source_path]
       extra_options2.each do |key, value|
-        args << ["-#{key}", "#{value}"]
+        args += ["-#{key}", "#{value}"]
       end
-      args << %w[pipe:1]
+      args += %w[pipe:1]
       @stdin, @stdout, @stderr, @process = Open3.popen3(*args)
     end
 
