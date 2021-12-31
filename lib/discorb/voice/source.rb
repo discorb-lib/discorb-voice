@@ -55,7 +55,6 @@ module Discorb::Voice
       end
       args = %W[
         ffmpeg
-        -map_metadata -1
         -f opus
         -c:a libopus
         -ar 48000
@@ -65,7 +64,7 @@ module Discorb::Voice
       extra_options.each do |key, value|
         args += ["-#{key}", "#{value}"]
       end
-      args += ["-i", source_path]
+      args += %W[-i source_path -map_metadata -1]
       extra_options2.each do |key, value|
         args += ["-#{key}", "#{value}"]
       end
