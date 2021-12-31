@@ -69,6 +69,7 @@ module Discorb::Voice
       extra_options2.each do |key, value|
         args << ["-#{key}", "#{value}"]
       end
+      args << %w[pipe:1]
       @stdin, @stdout, @stderr, @process = Open3.popen3(*args)
     end
 
