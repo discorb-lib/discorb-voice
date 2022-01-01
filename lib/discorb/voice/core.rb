@@ -146,7 +146,7 @@ module Discorb
       # Disconnects from the voice server.
       #
       def disconnect
-        @connection.close
+        @connection.close rescue nil
         @client.disconnect_voice(@guild_id)
         cleanup
       end
@@ -180,54 +180,52 @@ module Discorb
         Async do
           endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
           @client.log.info("Connecting to #{endpoint}")
-          Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection) do |conn|
-            @connection = conn
-            @status = :connected
-            if resume
-              send_connection_message(
-                7,
-                {
-                  server_id: @guild_id,
-                  session_id: @client.session_id,
-                  token: @token,
-                }
-              )
-            else
-              send_connection_message(
-                0,
-                {
-                  server_id: @guild_id,
-                  user_id: @client.user.id,
-                  session_id: @client.session_id,
-                  token: @token,
-                }
-              )
-            end
-            while (raw_message = @connection.read)
-              message = JSON.parse(raw_message, symbolize_names: true)
-              handle_voice_connection(message)
-            end
-          rescue Async::Wrapper::Cancelled
+          @connection = Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection)
+          @status = :connected
+          if resume
+            send_connection_message(
+              7,
+              {
+                server_id: @guild_id,
+                session_id: @client.session_id,
+                token: @token,
+              }
+            )
+          else
+            send_connection_message(
+              0,
+              {
+                server_id: @guild_id,
+                user_id: @client.user.id,
+                session_id: @client.session_id,
+                token: @token,
+              }
+            )
+          end
+          while (raw_message = @connection.read)
+            message = JSON.parse(raw_message, symbolize_names: true)
+            handle_voice_connection(message)
+          end
+        rescue Async::Wrapper::Cancelled
+          @status = :closed
+          cleanup
+        rescue Errno::EPIPE
+          @status = :reconnecting
+          @connect_condition = Async::Condition.new
+          start_receive false
+        rescue Protocol::WebSocket::ClosedError => e
+          case e.code
+          when 4014
             @status = :closed
             cleanup
-          rescue Errno::EPIPE
+          when 4006
             @status = :reconnecting
             @connect_condition = Async::Condition.new
             start_receive false
-          rescue Protocol::WebSocket::ClosedError => e
-            case e.code
-            when 4014
-              @status = :closed
-              cleanup
-            when 4006
-              @status = :reconnecting
-              @connect_condition = Async::Condition.new
-              start_receive false
-            when 4015, 1001, 4009
-              @status = :reconnecting
-              @connect_condition = Async::Condition.new
-              start_receive true
-            end
+          when 4015, 1001, 4009
+            @status = :reconnecting
+            @connect_condition = Async::Condition.new
+            start_receive true
           end
         end
       end
