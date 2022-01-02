@@ -105,10 +105,10 @@ module Discorb
             # @voice_connection.flush
           end
           # p :e
-          # @playing_status = :stopped
-          # @playing_condition.signal
-          # source.cleanup
-          # stop_speaking
+          @playing_status = :stopped
+          @playing_condition.signal
+          source.cleanup
+          stop_speaking
         end
       end
 
