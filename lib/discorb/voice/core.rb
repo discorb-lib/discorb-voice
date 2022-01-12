@@ -90,6 +90,10 @@ module Discorb
               break
             elsif @playing_status == :paused
               @paused_condition.wait
+            elsif @playing_status != :connected
+              sleep 0.02 while @playing_status != :connected
+
+              speaking(high_priority: high_priority)
             end
             # p i
             @timestamp += (OPUS_SAMPLE_RATE / 1000.0 * OPUS_FRAME_LENGTH).to_i
@@ -209,10 +213,10 @@ module Discorb
         rescue Async::Wrapper::Cancelled
           @status = :closed
           cleanup
-        rescue Errno::EPIPE
+        rescue Errno::EPIPE, EOFError
           @status = :reconnecting
           @connect_condition = Async::Condition.new
-          start_receive false
+          start_receive true
         rescue Protocol::WebSocket::ClosedError => e
           case e.code
           when 4014
@@ -222,7 +226,7 @@ module Discorb
             @status = :reconnecting
             @connect_condition = Async::Condition.new
             start_receive false
-          when 4015, 1001, 4009
+          else
             @status = :reconnecting
             @connect_condition = Async::Condition.new
             start_receive true
