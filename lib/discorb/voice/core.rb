@@ -84,14 +84,13 @@ module Discorb
           delay = OPUS_FRAME_LENGTH / 1000.0
 
           stream.packets.each_with_index do |packet, i|
-            @connect_condition.wait if @status == :connecting
             if @playing_status == :stopped
               source.cleanup
               break
             elsif @playing_status == :paused
               @paused_condition.wait
-            elsif @playing_status != :connected
-              sleep 0.02 while @playing_status != :connected
+            elsif @status != :connected
+              sleep 0.02 while @status != :connected
 
               speaking(high_priority: high_priority)
             end
