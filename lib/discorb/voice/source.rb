@@ -78,10 +78,12 @@ module Discorb::Voice
     end
 
     #
-    # Kills the FFmpeg process.
+    # Kills the FFmpeg process, and closes io.
     #
     def cleanup
       @process.kill
+      @stdin.close
+      @stdout.close
       if @tmp_path
         File.delete(@tmp_path)
       end

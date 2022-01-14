@@ -89,8 +89,8 @@ module Discorb
               break
             elsif @playing_status == :paused
               @paused_condition.wait
-            elsif @status != :connected
-              sleep 0.02 while @status != :connected
+            elsif @status != :ready
+              sleep 0.02 while @status != :ready
 
               speaking(high_priority: high_priority)
             end
