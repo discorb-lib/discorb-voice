@@ -241,7 +241,7 @@ module Discorb
           @heartbeat_task = handle_heartbeat(data[:heartbeat_interval])
         when 2
           @port, @ip = data[:port], data[:ip]
-          @client.log.debug("Connected to voice UDP, #{@ip}:#{@port}")
+          @client.log.debug("Connecting to voice UDP, #{@ip}:#{@port}")
           @sockaddr = Socket.pack_sockaddr_in(@port, @ip)
           @voice_connection = UDPSocket.new
           @voice_connection.connect(@ip, @port)
@@ -308,6 +308,12 @@ module Discorb
           }.to_json
         )
         @connection.flush
+      rescue IOError, Errno::EPIPE
+        @status = :reconnecting
+        @client.log.warn("Voice connection closed")
+        @connection.close
+        @connect_condition = Async::Condition.new
+        start_receive true
       end
     end
   end
