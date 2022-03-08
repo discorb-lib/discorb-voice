@@ -6,18 +6,13 @@ require "rbnacl"
 require "socket"
 
 module Discorb
-  module Connectable
-    def connect
-      Async do
-        @client.connect_to(self).wait
-      end
-    end
-  end
-
   module Voice
-    OPUS_SAMPLE_RATE = 48000
+    OPUS_SAMPLE_RATE = 48_000
     OPUS_FRAME_LENGTH = 20
 
+    #
+    # Client for voice connection.
+    #
     class Client
       # @private
       attr_reader :connect_condition
@@ -83,7 +78,7 @@ module Discorb
           @start_time = Time.now.to_f
           delay = OPUS_FRAME_LENGTH / 1000.0
 
-          stream.packets.each_with_index do |packet, i|
+          stream.packets.each_with_index do |packet, _i|
             if @playing_status == :stopped
               source.cleanup
               break
@@ -115,7 +110,7 @@ module Discorb
         end
       end
 
-      # Note: This is commented out because it raises an error.
+      # NOTE: This is commented out because it raises an error.
       #    It's not clear why this is happening.
       # #
       # # Pause playing audio.
@@ -149,7 +144,11 @@ module Discorb
       # Disconnects from the voice server.
       #
       def disconnect
-        @connection.close rescue nil
+        begin
+          @connection.close
+        rescue StandardError
+          nil
+        end
         @client.disconnect_voice(@guild_id)
         cleanup
       end
@@ -301,10 +300,10 @@ module Discorb
         end
       end
 
-      def send_connection_message(op, data)
+      def send_connection_message(opcode, data)
         @connection.write(
           {
-            op: op,
+            op: opcode,
             d: data,
           }.to_json
         )

@@ -1,4 +1,6 @@
-module Discorb::Voice
+# frozen_string_literal: true
+module Discorb
+  module Voice
   #
   # Represents a Ogg stream.
   #
@@ -40,9 +42,7 @@ module Discorb::Voice
       Enumerator.new do |enum|
         loop do
           # p c += 1
-          if @io.read(4) != "OggS"
-            break
-          end
+          break if @io.read(4) != "OggS"
           pg = Page.new(@io)
           pg.packets.each do |packet|
             enum << packet
@@ -116,5 +116,6 @@ module Discorb::Voice
         end
       end
     end
+  end
   end
 end
