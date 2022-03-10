@@ -174,7 +174,7 @@ module Discorb
           # @sockaddr
         )
       rescue IOError
-        @client.log.warn("Voice connection closed")
+        @client.log.warn("Voice UDP connection closed")
         @playing_task.stop if @status != :closed
       end
 
@@ -309,12 +309,11 @@ module Discorb
         )
         @connection.flush
       rescue IOError, Errno::EPIPE
-        next if @status == :connecting
+        next if @status == :reconnecting
         @status = :reconnecting
-        @client.log.warn("Voice connection closed")
+        @client.log.warn("Voice Websocket connection closed")
         @connection.close
         @connect_condition = Async::Condition.new
-        @status = :connecting
         start_receive true
       end
     end
