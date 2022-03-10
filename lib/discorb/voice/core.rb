@@ -309,10 +309,12 @@ module Discorb
         )
         @connection.flush
       rescue IOError, Errno::EPIPE
+        next if @status == :connecting
         @status = :reconnecting
         @client.log.warn("Voice connection closed")
         @connection.close
         @connect_condition = Async::Condition.new
+        @status = :connecting
         start_receive true
       end
     end
