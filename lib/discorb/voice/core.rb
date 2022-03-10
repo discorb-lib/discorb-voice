@@ -309,7 +309,7 @@ module Discorb
         )
         @connection.flush
       rescue IOError, Errno::EPIPE
-        next if @status == :reconnecting
+        return if @status == :reconnecting
         @status = :reconnecting
         @client.log.warn("Voice Websocket connection closed")
         @connection.close
