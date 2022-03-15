@@ -180,54 +180,57 @@ module Discorb
 
       def start_receive(resume)
         Async do
-          endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
-          @client.log.info("Connecting to #{endpoint}")
-          @connection = Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection)
-          @status = :connected
-          if resume
-            send_connection_message(
-              7,
-              {
-                server_id: @guild_id,
-                session_id: @client.session_id,
-                token: @token,
-              }
-            )
-          else
-            send_connection_message(
-              0,
-              {
-                server_id: @guild_id,
-                user_id: @client.user.id,
-                session_id: @client.session_id,
-                token: @token,
-              }
-            )
-          end
-          while (raw_message = @connection.read)
-            message = JSON.parse(raw_message, symbolize_names: true)
-            handle_voice_connection(message)
-          end
-        rescue Async::Wrapper::Cancelled
-          @status = :closed
-          cleanup
-        rescue Errno::EPIPE, EOFError
-          @status = :reconnecting
-          @connect_condition = Async::Condition.new
-          start_receive true
-        rescue Protocol::WebSocket::ClosedError => e
-          case e.code
-          when 4014
+          @voice_mutexes[@guild_id] ||= Mutex.new
+          next if @voice_mutexes[@guild_id].locked?
+          @voice_mutexes[@guild_id].synchronize do
+            endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
+            @client.log.info("Connecting to #{endpoint}")
+            @connection = Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection)
+            @status = :connected
+            if resume
+              send_connection_message(
+                7,
+                {
+                  server_id: @guild_id,
+                  session_id: @client.session_id,
+                  token: @token,
+                }
+              )
+            else
+              send_connection_message(
+                0,
+                {
+                  server_id: @guild_id,
+                  user_id: @client.user.id,
+                  session_id: @client.session_id,
+                  token: @token,
+                }
+              )
+            end
+            while (raw_message = @connection.read)
+              message = JSON.parse(raw_message, symbolize_names: true)
+              handle_voice_connection(message)
+            end
+          rescue Async::Wrapper::Cancelled
             @status = :closed
             cleanup
-          when 4006
-            @status = :reconnecting
-            @connect_condition = Async::Condition.new
-            start_receive false
-          else
+          rescue Errno::EPIPE, EOFError
             @status = :reconnecting
             @connect_condition = Async::Condition.new
             start_receive true
+          rescue Protocol::WebSocket::ClosedError => e
+            case e.code
+            when 4014
+              @status = :closed
+              cleanup
+            when 4006
+              @status = :reconnecting
+              @connect_condition = Async::Condition.new
+              start_receive false
+            else
+              @status = :closed
+              cleanup
+            end
           end
         end
       end

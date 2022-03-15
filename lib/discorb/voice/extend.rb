@@ -11,6 +11,7 @@ module Discorb
         super
         @voice_clients = Discorb::Dictionary.new
         @voice_conditions = {}
+        @voice_mutexes = {}
       end
 
       def event_voice_server_update(data)
