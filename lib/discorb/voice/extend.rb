@@ -6,6 +6,7 @@ module Discorb
     # @private
     module ClientVoicePrepend
       attr_reader :voice_conditions
+      attr_reader :voice_mutexes
 
       def initialize(*, **)
         super
