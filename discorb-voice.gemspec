@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
 
   # Uncomment to register a new dependency of your gem
   # spec.add_dependency "example-gem", "~> 1.0"
-  spec.add_dependency "discorb", ">= 0.13.0"
+  spec.add_dependency "discorb", ">= 0.16.0"
   spec.add_dependency "ffi", ">= 1.15.3"
   spec.add_dependency "rbnacl"
 
