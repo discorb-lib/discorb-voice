@@ -174,7 +174,7 @@ module Discorb
           # @sockaddr
         )
       rescue IOError
-        @client.log.warn("Voice UDP connection closed")
+        @client.logger.warn("Voice UDP connection closed")
         @playing_task.stop if @status != :closed
       end
 
@@ -184,7 +184,7 @@ module Discorb
           next if @client.voice_mutexes[@guild_id].locked?
           @client.voice_mutexes[@guild_id].synchronize do
             endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
-            @client.log.info("Connecting to #{endpoint}")
+            @client.logger.info("Connecting to #{endpoint}")
             @connection = Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection)
             @status = :connected
             if resume
@@ -236,7 +236,7 @@ module Discorb
       end
 
       def handle_voice_connection(message)
-        @client.log.debug("Voice connection message: #{message}")
+        @client.logger.debug("Voice connection message: #{message}")
         data = message[:d]
         # pp data
         case message[:op]
@@ -244,7 +244,7 @@ module Discorb
           @heartbeat_task = handle_heartbeat(data[:heartbeat_interval])
         when 2
           @port, @ip = data[:port], data[:ip]
-          @client.log.debug("Connecting to voice UDP, #{@ip}:#{@port}")
+          @client.logger.debug("Connecting to voice UDP, #{@ip}:#{@port}")
           @sockaddr = Socket.pack_sockaddr_in(@port, @ip)
           @voice_connection = UDPSocket.new
           @voice_connection.connect(@ip, @port)
@@ -314,7 +314,7 @@ module Discorb
       rescue IOError, Errno::EPIPE
         return if @status == :reconnecting
         @status = :reconnecting
-        @client.log.warn("Voice Websocket connection closed")
+        @client.logger.warn("Voice Websocket connection closed")
         @connection.close
         @connect_condition = Async::Condition.new
         start_receive true
