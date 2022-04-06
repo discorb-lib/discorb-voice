@@ -217,6 +217,7 @@ module Discorb
           rescue Errno::EPIPE, EOFError
             @status = :reconnecting
             @connect_condition = Async::Condition.new
+            @client.voice_mutexes[@guild_id].unlock
             start_receive true
           rescue Protocol::WebSocket::ClosedError => e
             case e.code
@@ -226,6 +227,7 @@ module Discorb
             when 4006
               @status = :reconnecting
               @connect_condition = Async::Condition.new
+              @client.voice_mutexes[@guild_id].unlock
               start_receive false
             else
               @status = :closed
