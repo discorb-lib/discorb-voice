@@ -16,7 +16,7 @@ module Discorb
       end
 
       def event_voice_server_update(data)
-        @log.debug("Received VOICE_SERVER_UPDATE")
+        @logger.debug("Received VOICE_SERVER_UPDATE")
         client = Discorb::Voice::Client.new(self, data)
         @voice_clients[data[:guild_id]] = client
         client.connect_condition.wait
