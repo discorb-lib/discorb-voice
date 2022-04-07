@@ -34,7 +34,7 @@ module Discorb
 
       def connect_to(channel)
         Async do
-          @log.debug("Connecting to #{channel.id}")
+          @logger.debug("Connecting to #{channel.id}")
           send_gateway(
             4,
             guild_id: channel.guild.id.to_s,
