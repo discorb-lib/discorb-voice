@@ -2,6 +2,11 @@
 
 require "discorb"
 begin
+  require "discorb/voice_dlls"
+rescue LoadError
+  # do nothing
+end
+begin
   require "rbnacl"
 rescue LoadError
   raise LoadError, <<~ERROR, cause: nil

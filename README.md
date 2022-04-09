@@ -22,6 +22,15 @@ Or install it yourself as:
 
 #### Windows
 
+##### Option 1
+
+Install [discorb-voice_dlls gem](https://rubygems.org/gems/discorb-voice_dlls). It will install libsodium for you.
+```
+bundle add discorb-voice_dlls
+```
+
+##### Option 2
+
 Get libsodium from [here](https://download.libsodium.org/libsodium/releases/).
 I've checked `libsodium-1.0.17-stable-mingw.tar.gz` works.
 
