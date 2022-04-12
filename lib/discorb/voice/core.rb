@@ -313,7 +313,7 @@ module Discorb
           }.to_json
         )
         @connection.flush
-      rescue IOError, Errno::EPIPE
+      rescue IOError, Errno::EPIPE, OpenSSL::SSL::SSLError
         return if @status == :reconnecting
         @status = :reconnecting
         @client.logger.warn("Voice Websocket connection closed")

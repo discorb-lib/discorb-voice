@@ -5,7 +5,11 @@ module Discorb
   module Voice
     # @private
     module ClientVoicePrepend
+      # @private
+      # @return [Hash[String, Async::Condition]] The condition for waiting connect.
       attr_reader :voice_conditions
+      # @private
+      # @return [Hash[String, Thread::Mutex]] The mutex for waiting connect.
       attr_reader :voice_mutexes
 
       def initialize(*, **)
