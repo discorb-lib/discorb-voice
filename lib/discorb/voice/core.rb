@@ -180,6 +180,10 @@ module Discorb
 
       def start_receive(resume)
         Async do
+          if resume
+            @connection.force_close rescue nil
+            @heartbeat_task&.stop
+          end
           @client.voice_mutexes[@guild_id] ||= Mutex.new
           next if @client.voice_mutexes[@guild_id].locked?
           @client.voice_mutexes[@guild_id].synchronize do
