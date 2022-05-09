@@ -184,7 +184,7 @@ module Discorb
           @heartbeat_task&.stop
         end
         @client.voice_mutexes[@guild_id] ||= Mutex.new
-        next if @client.voice_mutexes[@guild_id].locked?
+        return if @client.voice_mutexes[@guild_id].locked?
         @client.voice_mutexes[@guild_id].synchronize do
           Async do
             endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
