@@ -179,14 +179,14 @@ module Discorb
       end
 
       def start_receive(resume)
-        Async do
-          if resume
-            @connection.force_close rescue nil
-            @heartbeat_task&.stop
-          end
-          @client.voice_mutexes[@guild_id] ||= Mutex.new
-          next if @client.voice_mutexes[@guild_id].locked?
-          @client.voice_mutexes[@guild_id].synchronize do
+        if resume
+          @connection.force_close rescue nil
+          @heartbeat_task&.stop
+        end
+        @client.voice_mutexes[@guild_id] ||= Mutex.new
+        next if @client.voice_mutexes[@guild_id].locked?
+        @client.voice_mutexes[@guild_id].synchronize do
+          Async do
             endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
             @client.logger.info("Connecting to #{endpoint}")
             @connection = Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection)
