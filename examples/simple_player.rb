@@ -13,7 +13,7 @@ client.slash "connect", "connect to a voice channel" do |interaction|
 end
 
 client.slash "play", "Plays audio" do |interaction|
-  interaction.guild.voice_client.play(Discorb::Voice::FFmpegAudio.new("./very-nice-song.mp3"))
+  interaction.guild.voice_client.play(Discorb::Voice::FFmpegAudio.new("./very_nice_song.mp3"))
   interaction.post "Playing Your very nice song!"
 end
 
