@@ -1,6 +1,8 @@
 require "discorb"
 require "discorb-voice"
 
+client = Discorb::Client.new
+
 client.once :standby do
   puts "Logged in as #{client.user}"
 end
