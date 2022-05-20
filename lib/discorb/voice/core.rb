@@ -179,65 +179,68 @@ module Discorb
       end
 
       def start_receive(resume)
-        if resume
-          @connection.force_close rescue nil
-          @heartbeat_task&.stop
-        end
-        @client.voice_mutexes[@guild_id] ||= Mutex.new
-        return if @client.voice_mutexes[@guild_id].locked?
-        @client.voice_mutexes[@guild_id].synchronize do
-          Async do
-            endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
-            @client.logger.info("Connecting to #{endpoint}")
-            @connection = Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection)
-            @status = :connected
-            if resume
-              send_connection_message(
-                7,
-                {
-                  server_id: @guild_id,
-                  session_id: @client.session_id,
-                  token: @token,
-                }
-              )
-            else
-              send_connection_message(
-                0,
-                {
-                  server_id: @guild_id,
-                  user_id: @client.user.id,
-                  session_id: @client.session_id,
-                  token: @token,
-                }
-              )
-            end
-            while (raw_message = @connection.read)
-              message = JSON.parse(raw_message, symbolize_names: true)
-              handle_voice_connection(message)
-            end
-          rescue Async::Wrapper::Cancelled
+        Async do
+          if resume
+            @connection.force_close rescue nil
+            @heartbeat_task&.stop
+          end
+          @client.voice_mutexes[@guild_id] ||= Mutex.new
+          next if @client.voice_mutexes[@guild_id].locked?
+          @client.voice_mutexes[@guild_id].lock
+          endpoint = Async::HTTP::Endpoint.parse("wss://" + @endpoint + "?v=4", alpn_protocols: Async::HTTP::Protocol::HTTP11.names)
+          @client.logger.info("Connecting to #{endpoint}")
+          @connection = Async::WebSocket::Client.connect(endpoint, handler: Discorb::Gateway::RawConnection)
+          @status = :connected
+          if resume
+            send_connection_message(
+              7,
+              {
+                server_id: @guild_id,
+                session_id: @client.session_id,
+                token: @token,
+              }
+            )
+          else
+            send_connection_message(
+              0,
+              {
+                server_id: @guild_id,
+                user_id: @client.user.id,
+                session_id: @client.session_id,
+                token: @token,
+              }
+            )
+          end
+          while (raw_message = @connection.read)
+            message = JSON.parse(raw_message, symbolize_names: true)
+            handle_voice_connection(message)
+          end
+        rescue Async::Wrapper::Cancelled
+          @status = :closed
+          cleanup
+        rescue Errno::EPIPE, EOFError
+          @client.logger.warn("Voice WebSocket connection closed without code.")
+          @status = :reconnecting
+          @connect_condition = Async::Condition.new
+          @client.voice_mutexes[@guild_id].unlock
+          @connection.force_close
+          start_receive true
+        rescue Protocol::WebSocket::ClosedError => e
+          @client.logger.warn("Voice WebSocket connection closed with code #{e.code}")
+          case e.code
+          when 4014
             @status = :closed
             cleanup
-          rescue Errno::EPIPE, EOFError
+          when 4006
             @status = :reconnecting
             @connect_condition = Async::Condition.new
             @client.voice_mutexes[@guild_id].unlock
-            start_receive true
-          rescue Protocol::WebSocket::ClosedError => e
-            case e.code
-            when 4014
-              @status = :closed
-              cleanup
-            when 4006
-              @status = :reconnecting
-              @connect_condition = Async::Condition.new
-              @client.voice_mutexes[@guild_id].unlock
-              start_receive false
-            else
-              @status = :closed
-              cleanup
-            end
+            start_receive false
+          else
+            @status = :closed
+            cleanup
           end
+          @client.voice_mutexes[@guild_id].unlock if @client.voice_mutexes[@guild_id].locked?
         end
       end
 
